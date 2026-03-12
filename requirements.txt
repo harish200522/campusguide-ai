@@ -1,0 +1,5 @@
+flask
+python-dotenv
+huggingface-hub
+cohere
+PyPDF2

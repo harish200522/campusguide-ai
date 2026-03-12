@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CampusGuide - Soft UI Design</title>
+<link rel="stylesheet" href="/static/style.css">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+
+<div class="soft-ui-wrapper">
+
+<!-- Hero Section -->
+<div class="hero-section">
+<div class="background-overlay"></div>
+
+<!-- Top Navigation Bar -->
+<div class="top-nav">
+<div class="nav-left">
+<button class="nav-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+<div class="nav-brand">CampusGuide</div>
+</div>
+<div class="nav-menu">
+<button class="btn-download" onclick="scrollToChat()">Get Started</button>
+</div>
+</div>
+
+<!-- Hero Content -->
+<div class="hero-content">
+<h1 class="hero-title">CampusGuide AI Assistant</h1>
+<p class="hero-subtitle">Your intelligent companion for campus navigation and student support.<br>Powered by advanced AI to help you succeed.</p>
+
+<!-- Stats Cards -->
+<div class="stats-container">
+<div class="stat-card">
+<div class="stat-number">70+</div>
+<div class="stat-label">Features</div>
+<div class="stat-desc">Aptitude, coding, interviews and more</div>
+</div>
+<div class="stat-card">
+<div class="stat-number">15+</div>
+<div class="stat-label">Modules</div>
+<div class="stat-desc">Comprehensive preparation tools</div>
+</div>
+<div class="stat-card">
+<div class="stat-number">4</div>
+<div class="stat-label">Services</div>
+<div class="stat-desc">24/7 AI-powered assistance</div>
+</div>
+</div>
+
+</div>
+</div>
+
+<!-- Sidebar -->
+<div class="sidebar" id="sidebar">
+
+<button class="toggle-sidebar" onclick="toggleSidebar()"><i class="fas fa-times"></i></button>
+
+<div class="logo">CampusGuide</div>
+
+<button class="new-chat" onclick="clearChat()"><i class="fas fa-plus"></i> New Chat</button>
+
+<div class="menu">
+
+<div class="menu-title" onclick="toggleChatHistory()">
+<span id="chat-history-arrow"><i class="fas fa-chevron-down"></i></span> Previous Chats
+</div>
+
+<div id="chat-history-container">
+{% for chat in chats %}
+<div class="chat-item-container">
+<div class="chat-item" onclick="loadChat({{chat[0]}})">
+{{ chat[1][:30] }}...
+</div>
+<button class="delete-chat" onclick="deleteChat({{chat[0]}}, event)" title="Delete chat"><i class="fas fa-trash"></i></button>
+</div>
+{% endfor %}
+</div>
+
+<hr>
+
+<div class="menu-item" onclick="quickMessage('aptitude')"><i class="fas fa-brain"></i> Aptitude Practice</div>
+<div class="menu-item" onclick="quickMessage('coding')"><i class="fas fa-code"></i> Coding Practice</div>
+<div class="menu-item" onclick="quickMessage('resume')"><i class="fas fa-file-alt"></i> Resume Guidance</div>
+<div class="menu-item" onclick="quickMessage('interview')"><i class="fas fa-comments"></i> Interview Preparation</div>
+<div class="menu-item" onclick="quickMessage('mock interview')"><i class="fas fa-microphone"></i> Mock Interview</div>
+
+</div>
+
+</div>
+
+
+<!-- Main Chat -->
+<div class="main" id="chatArea">
+
+<div id="chat-box" class="chat-box">
+
+<div class="bot-row">
+<div class="avatar"><i class="fas fa-robot"></i></div>
+<div class="message bot">
+Hello! I am CampusGuide. Ask me anything about placements.
+</div>
+</div>
+
+</div>
+
+
+<!-- Input Area -->
+<div class="input-container">
+<input type="file" id="resumeFile" style="display:none;" accept=".pdf,.doc,.docx,.txt">
+
+<div id="resumeContainer" style="display:none;">
+<button class="btn-upload" onclick="document.getElementById('resumeFile').click()"><i class="fas fa-upload"></i> Choose Resume</button>
+<button class="btn-upload" onclick="uploadResume()" id="analyzeBtn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"><i class="fas fa-file-upload"></i> Analyze Resume</button>
+<div id="fileNameDisplay" style="font-size: 13px; color: #667eea; font-weight: 500; min-width: 100px;">No file selected</div>
+</div>
+
+<textarea
+id="userInput"
+placeholder="Message CampusGuide..."
+rows="1"
+></textarea>
+
+<button class="btn-send" onclick="sendMessage()"><i class="fas fa-paper-plane"></i> Send</button>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+
+<script>
+function scrollToChat() {
+    const chatArea = document.getElementById("chatArea");
+    chatArea.scrollIntoView({ behavior: "smooth" });
+}
+
+function uploadResume(){
+
+let fileInput = document.getElementById("resumeFile")
+
+let file = fileInput.files[0]
+
+if(!file){
+alert("Please select a resume")
+return
+}
+
+let chat = document.getElementById("chat-box")
+
+// Show user message with filename
+let userRow = document.createElement("div");
+userRow.className = "user-row";
+userRow.innerHTML = `<div class="message user"><i class="fas fa-file-pdf"></i> Analyze my resume: ${file.name}</div>`;
+chat.appendChild(userRow);
+
+// Show AI thinking
+let thinking = document.createElement("div");
+thinking.className = "bot-row";
+thinking.id = "thinking";
+thinking.innerHTML = `
+<div class="avatar"><i class="fas fa-robot"></i></div>
+<div class="message bot"><i class="fas fa-spinner fa-spin"></i> AI is analyzing your resume...</div>
+`;
+chat.appendChild(thinking);
+chat.scrollTop = chat.scrollHeight;
+
+// Disable buttons while processing
+let analyzeBtn = document.getElementById("analyzeBtn");
+let sendBtn = document.querySelector("button[onclick='sendMessage()']");
+analyzeBtn.disabled = true;
+if(sendBtn) sendBtn.disabled = true;
+
+let formData = new FormData()
+formData.append("resume", file)
+
+fetch("/upload_resume",{
+method:"POST",
+body:formData
+})
+.then(res=>res.text())
+.then(data=>{
+
+document.getElementById("thinking").remove();
+
+function escapeHtml(str) {
+    return str.replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/"/g, "&quot;")
+              .replace(/'/g, "&#039;");
+}
+
+let botRow = document.createElement("div");
+botRow.className = "bot-row";
+botRow.innerHTML = `
+<div class="avatar"><i class="fas fa-robot"></i></div>
+<div class="message bot">${escapeHtml(data).replace(/\n/g,"<br>")}</div>
+`;
+chat.appendChild(botRow);
+chat.scrollTop = chat.scrollHeight;
+
+// Re-enable buttons
+analyzeBtn.disabled = false;
+if(sendBtn) sendBtn.disabled = false;
+
+})
+.catch(error => {
+console.error("Error:", error);
+document.getElementById("thinking").remove();
+let errorRow = document.createElement("div");
+errorRow.className = "bot-row";
+errorRow.innerHTML = `
+<div class="avatar"><i class="fas fa-robot"></i></div>
+<div class="message bot" style="color: #ff6b6b;">Sorry, failed to analyze the resume. Please try again.</div>
+`;
+chat.appendChild(errorRow);
+chat.scrollTop = chat.scrollHeight;
+analyzeBtn.disabled = false;
+if(sendBtn) sendBtn.disabled = false;
+});
+
+}
+
+// Update filename display when a file is selected
+document.getElementById("resumeFile").addEventListener("change", function(event) {
+    let fileName = event.target.files[0]?.name || "No file selected";
+    document.getElementById("fileNameDisplay").textContent = fileName;
+});
+
+/* ENTER = SEND | SHIFT+ENTER = NEW LINE */
+
+document.getElementById("userInput").addEventListener("keydown", function(event){
+
+if(event.key === "Enter" && !event.shiftKey){
+
+event.preventDefault();
+sendMessage();
+
+}
+
+});
+
+
+function sendMessage(){
+
+let input = document.getElementById("userInput");
+let text = input.value;
+
+if(text.trim() === "") return;
+
+let chat = document.getElementById("chat-box");
+let resumeContainer = document.getElementById("resumeContainer");
+
+// Check if the message is about resume
+if(text.toLowerCase().includes("resume")){
+    resumeContainer.style.display = "flex";
+} else if(text.trim() === "resume") {
+    resumeContainer.style.display = "flex";
+}
+
+/* USER MESSAGE */
+
+let userRow = document.createElement("div");
+userRow.className = "user-row";
+
+userRow.innerHTML = `
+<div class="message user">${text.replace(/\n/g,"<br>")}</div>
+`;
+
+chat.appendChild(userRow);
+
+
+/* AI THINKING */
+
+let thinking = document.createElement("div");
+thinking.className = "bot-row";
+thinking.id = "thinking";
+
+thinking.innerHTML = `
+<div class="avatar"><i class="fas fa-robot"></i></div>
+<div class="message bot"><i class="fas fa-spinner fa-spin"></i> AI is thinking...</div>
+`;
+
+chat.appendChild(thinking);
+
+chat.scrollTop = chat.scrollHeight;
+
+input.value = "";
+
+
+/* SEND TO BACKEND */
+
+setTimeout(function(){
+
+// Disable input while processing
+let sendBtn = document.querySelector("button[onclick='sendMessage()']");
+let inputField = document.getElementById("userInput");
+inputField.disabled = true;
+if(sendBtn) sendBtn.disabled = true;
+
+fetch("/get",{
+method:"POST",
+headers:{
+"Content-Type":"application/x-www-form-urlencoded"
+},
+body:"msg="+encodeURIComponent(text)
+})
+
+.then(res=>res.text())
+
+.then(data=>{
+
+document.getElementById("thinking").remove();
+
+/* BOT RESPONSE */
+
+let botRow = document.createElement("div");
+botRow.className = "bot-row";
+
+// Simple HTML escaping to prevent XSS
+function escapeHtml(str) {
+    return str.replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/"/g, "&quot;")
+              .replace(/'/g, "&#039;");
+}
+
+botRow.innerHTML = `
+<div class="avatar"><i class="fas fa-robot"></i></div>
+<div class="message bot">${escapeHtml(data).replace(/\n/g,"<br>")}</div>
+`;
+
+chat.appendChild(botRow);
+
+chat.scrollTop = chat.scrollHeight;
+
+// Re-enable input
+inputField.disabled = false;
+if(sendBtn) sendBtn.disabled = false;
+
+})
+
+.catch(error => {
+console.error("Error:", error);
+document.getElementById("thinking").remove();
+
+let errorRow = document.createElement("div");
+errorRow.className = "bot-row";
+errorRow.innerHTML = `
+<div class="avatar"><i class="fas fa-robot"></i></div>
+<div class="message bot" style="color: #ff6b6b;">Sorry, something went wrong. Please try again.</div>
+`;
+chat.appendChild(errorRow);
+chat.scrollTop = chat.scrollHeight;
+
+// Re-enable input
+inputField.disabled = false;
+if(sendBtn) sendBtn.disabled = false;
+});
+
+},800);
+
+}
+
+
+/* QUICK MODULE BUTTONS */
+
+function quickMessage(msg){
+
+document.getElementById("userInput").value = msg;
+
+// Close sidebar when menu item is clicked
+let sidebar = document.getElementById("sidebar");
+sidebar.classList.remove("active");
+
+scrollToChat();
+
+// Show resume buttons only for resume guidance
+let resumeContainer = document.getElementById("resumeContainer");
+if(msg.toLowerCase() === 'resume'){
+    resumeContainer.style.display = "flex";
+} else {
+    resumeContainer.style.display = "none";
+}
+
+sendMessage();
+
+}
+
+
+/* CLEAR CHAT */
+
+function clearChat(){
+
+let chat = document.getElementById("chat-box");
+let resumeContainer = document.getElementById("resumeContainer");
+
+chat.innerHTML = `
+<div class="bot-row">
+<div class="avatar"><i class="fas fa-robot"></i></div>
+<div class="message bot">
+Hello! I am CampusGuide. Ask me anything about placements.
+</div>
+</div>
+`;
+
+resumeContainer.style.display = "none";
+
+}
+
+
+/* LOAD PREVIOUS CHAT */
+
+function loadChat(id){
+
+// Clear current chat first
+let chat = document.getElementById("chat-box");
+chat.innerHTML = `
+<div class="bot-row">
+<div class="avatar"><i class="fas fa-robot"></i></div>
+<div class="message bot">
+Hello! I am CampusGuide. Ask me anything about placements.
+</div>
+</div>
+`;
+
+fetch("/chat/"+id)
+.then(res=>res.json())
+.then(data=>{
+
+// Simple HTML escaping to prevent XSS
+function escapeHtml(str) {
+    return str.replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/"/g, "&quot;")
+              .replace(/'/g, "&#039;");
+}
+
+chat.innerHTML += `
+<div class="user-row">
+<div class="message user">${escapeHtml(data.user).replace(/\n/g,"<br>")}</div>
+</div>
+
+<div class="bot-row">
+<div class="avatar">AI</div>
+<div class="message bot">${escapeHtml(data.bot).replace(/\n/g,"<br>")}</div>
+</div>
+`;
+
+chat.scrollTop = chat.scrollHeight;
+
+})
+.catch(error => {
+console.error("Error loading chat:", error);
+alert("Failed to load chat history. Please try again.");
+});
+
+}
+
+/* TOGGLE SIDEBAR */
+
+function toggleSidebar(){
+let sidebar = document.getElementById("sidebar");
+sidebar.classList.toggle("active");
+}
+
+/* CLOSE SIDEBAR WHEN CLICKING OUTSIDE */
+
+document.addEventListener("click", function(event){
+let sidebar = document.getElementById("sidebar");
+let navBtn = document.querySelector(".nav-btn");
+
+// Close sidebar if click is outside sidebar and not on menu button
+if(!sidebar.contains(event.target) && !navBtn.contains(event.target)){
+    sidebar.classList.remove("active");
+}
+});
+
+/* TOGGLE CHAT HISTORY DROPDOWN */
+
+function toggleChatHistory(){
+let container = document.getElementById("chat-history-container");
+let arrow = document.getElementById("chat-history-arrow");
+
+if(container.style.display === "none"){
+container.style.display = "block";
+arrow.innerHTML = "▼";
+}else{
+container.style.display = "none";
+arrow.innerHTML = "▶";
+}
+}
+
+/* DELETE CHAT */
+
+function deleteChat(id, event){
+// Stop the click from bubbling up to the chat item
+event.stopPropagation();
+
+if(!confirm("Are you sure you want to delete this chat?")){
+return;
+}
+
+console.log("Deleting chat ID:", id);
+
+fetch("/delete_chat/"+id, {
+method:"DELETE"
+})
+.then(res=>{
+console.log("Response status:", res.status);
+return res.text();
+})
+.then(data=>{
+console.log("Delete response:", data);
+// Remove the chat item from the sidebar
+let chatItem = event.target.closest(".chat-item-container");
+if(chatItem){
+chatItem.remove();
+console.log("Chat item removed from UI");
+}
+})
+.catch(error => {
+console.error("Error deleting chat:", error);
+alert("Failed to delete chat. Please try again.");
+});
+}
+
+</script>
+
+</body>
+</html>
