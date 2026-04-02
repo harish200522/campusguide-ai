@@ -10,9 +10,8 @@ def extract_text_from_pdf(file):
             text += extracted
     return text.strip()
 
-def analyze_resume(file):
-    text = extract_text_from_pdf(file)
 
+def analyze_resume_text(text):
     if not text:
         return "Could not extract text from the resume. Please upload a valid PDF."
 
@@ -32,3 +31,7 @@ Here is the resume content:
 Give a detailed, helpful, and encouraging analysis."""
 
     return ai_response(prompt)
+
+def analyze_resume(file):
+    text = extract_text_from_pdf(file)
+    return analyze_resume_text(text)

@@ -5,6 +5,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CampusGuide - Soft UI Design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/style.css">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -98,6 +101,8 @@
 <!-- Main Chat -->
 <div class="main" id="chatArea">
 
+<div class="chat-panel">
+
 <div id="chat-box" class="chat-box">
 
 <div class="bot-row">
@@ -116,17 +121,18 @@ Hello! I am CampusGuide. Ask me anything about placements.
 
 <div id="resumeContainer" style="display:none;">
 <button class="btn-upload" onclick="document.getElementById('resumeFile').click()"><i class="fas fa-upload"></i> Choose Resume</button>
-<button class="btn-upload" onclick="uploadResume()" id="analyzeBtn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"><i class="fas fa-file-upload"></i> Analyze Resume</button>
 <div id="fileNameDisplay" style="font-size: 13px; color: #667eea; font-weight: 500; min-width: 100px;">No file selected</div>
 </div>
 
 <textarea
 id="userInput"
-placeholder="Message CampusGuide..."
+placeholder="Message CampusGuide or attach a resume..."
 rows="1"
 ></textarea>
 
 <button class="btn-send" onclick="sendMessage()"><i class="fas fa-paper-plane"></i> Send</button>
+
+</div>
 
 </div>
 
@@ -143,54 +149,6 @@ function scrollToChat() {
     chatArea.scrollIntoView({ behavior: "smooth" });
 }
 
-function uploadResume(){
-
-let fileInput = document.getElementById("resumeFile")
-
-let file = fileInput.files[0]
-
-if(!file){
-alert("Please select a resume")
-return
-}
-
-let chat = document.getElementById("chat-box")
-
-// Show user message with filename
-let userRow = document.createElement("div");
-userRow.className = "user-row";
-userRow.innerHTML = `<div class="message user"><i class="fas fa-file-pdf"></i> Analyze my resume: ${file.name}</div>`;
-chat.appendChild(userRow);
-
-// Show AI thinking
-let thinking = document.createElement("div");
-thinking.className = "bot-row";
-thinking.id = "thinking";
-thinking.innerHTML = `
-<div class="avatar"><i class="fas fa-robot"></i></div>
-<div class="message bot"><i class="fas fa-spinner fa-spin"></i> AI is analyzing your resume...</div>
-`;
-chat.appendChild(thinking);
-chat.scrollTop = chat.scrollHeight;
-
-// Disable buttons while processing
-let analyzeBtn = document.getElementById("analyzeBtn");
-let sendBtn = document.querySelector("button[onclick='sendMessage()']");
-analyzeBtn.disabled = true;
-if(sendBtn) sendBtn.disabled = true;
-
-let formData = new FormData()
-formData.append("resume", file)
-
-fetch("/upload_resume",{
-method:"POST",
-body:formData
-})
-.then(res=>res.text())
-.then(data=>{
-
-document.getElementById("thinking").remove();
-
 function escapeHtml(str) {
     return str.replace(/&/g, "&amp;")
               .replace(/</g, "&lt;")
@@ -199,41 +157,13 @@ function escapeHtml(str) {
               .replace(/'/g, "&#039;");
 }
 
-let botRow = document.createElement("div");
-botRow.className = "bot-row";
-botRow.innerHTML = `
-<div class="avatar"><i class="fas fa-robot"></i></div>
-<div class="message bot">${escapeHtml(data).replace(/\n/g,"<br>")}</div>
-`;
-chat.appendChild(botRow);
-chat.scrollTop = chat.scrollHeight;
-
-// Re-enable buttons
-analyzeBtn.disabled = false;
-if(sendBtn) sendBtn.disabled = false;
-
-})
-.catch(error => {
-console.error("Error:", error);
-document.getElementById("thinking").remove();
-let errorRow = document.createElement("div");
-errorRow.className = "bot-row";
-errorRow.innerHTML = `
-<div class="avatar"><i class="fas fa-robot"></i></div>
-<div class="message bot" style="color: #ff6b6b;">Sorry, failed to analyze the resume. Please try again.</div>
-`;
-chat.appendChild(errorRow);
-chat.scrollTop = chat.scrollHeight;
-analyzeBtn.disabled = false;
-if(sendBtn) sendBtn.disabled = false;
-});
-
-}
-
 // Update filename display when a file is selected
 document.getElementById("resumeFile").addEventListener("change", function(event) {
     let fileName = event.target.files[0]?.name || "No file selected";
     document.getElementById("fileNameDisplay").textContent = fileName;
+    if(event.target.files[0]) {
+        document.getElementById("resumeContainer").style.display = "flex";
+    }
 });
 
 /* ENTER = SEND | SHIFT+ENTER = NEW LINE */
@@ -249,21 +179,29 @@ sendMessage();
 
 });
 
+document.getElementById("userInput").addEventListener("input", function() {
+this.style.height = "auto";
+this.style.height = Math.min(this.scrollHeight, 140) + "px";
+});
+
 
 function sendMessage(){
 
 let input = document.getElementById("userInput");
 let text = input.value;
+let trimmedText = text.trim();
+let fileInput = document.getElementById("resumeFile");
+let selectedFile = fileInput.files[0];
 
-if(text.trim() === "") return;
+if(trimmedText === "" && !selectedFile) return;
 
 let chat = document.getElementById("chat-box");
 let resumeContainer = document.getElementById("resumeContainer");
 
 // Check if the message is about resume
-if(text.toLowerCase().includes("resume")){
+if(trimmedText.toLowerCase().includes("resume") || selectedFile){
     resumeContainer.style.display = "flex";
-} else if(text.trim() === "resume") {
+} else if(trimmedText === "resume") {
     resumeContainer.style.display = "flex";
 }
 
@@ -272,9 +210,16 @@ if(text.toLowerCase().includes("resume")){
 let userRow = document.createElement("div");
 userRow.className = "user-row";
 
-userRow.innerHTML = `
-<div class="message user">${text.replace(/\n/g,"<br>")}</div>
-`;
+let userMessageHtml = "";
+if(selectedFile && trimmedText){
+    userMessageHtml = `<i class="fas fa-file-pdf"></i> ${escapeHtml(selectedFile.name)}<br>${escapeHtml(text).replace(/\n/g,"<br>")}`;
+} else if(selectedFile){
+    userMessageHtml = `<i class="fas fa-file-pdf"></i> Uploaded resume: ${escapeHtml(selectedFile.name)}`;
+} else {
+    userMessageHtml = `${escapeHtml(text).replace(/\n/g,"<br>")}`;
+}
+
+userRow.innerHTML = `<div class="message user">${userMessageHtml}</div>`;
 
 chat.appendChild(userRow);
 
@@ -287,7 +232,7 @@ thinking.id = "thinking";
 
 thinking.innerHTML = `
 <div class="avatar"><i class="fas fa-robot"></i></div>
-<div class="message bot"><i class="fas fa-spinner fa-spin"></i> AI is thinking...</div>
+<div class="message bot"><i class="fas fa-spinner fa-spin"></i> ${selectedFile ? "Processing your resume and question..." : "AI is thinking..."}</div>
 `;
 
 chat.appendChild(thinking);
@@ -296,26 +241,34 @@ chat.scrollTop = chat.scrollHeight;
 
 input.value = "";
 
-
-/* SEND TO BACKEND */
-
-setTimeout(function(){
-
 // Disable input while processing
 let sendBtn = document.querySelector("button[onclick='sendMessage()']");
 let inputField = document.getElementById("userInput");
+let chooseBtn = document.querySelector("#resumeContainer .btn-upload");
 inputField.disabled = true;
 if(sendBtn) sendBtn.disabled = true;
+if(chooseBtn) chooseBtn.disabled = true;
 
-fetch("/get",{
-method:"POST",
-headers:{
-"Content-Type":"application/x-www-form-urlencoded"
-},
-body:"msg="+encodeURIComponent(text)
-})
+let requestPromise;
+if(selectedFile){
+    let formData = new FormData();
+    formData.append("resume", selectedFile);
+    formData.append("msg", text);
+    requestPromise = fetch("/upload_resume", {
+        method:"POST",
+        body: formData
+    });
+} else {
+    requestPromise = fetch("/get",{
+        method:"POST",
+        headers:{
+            "Content-Type":"application/x-www-form-urlencoded"
+        },
+        body:"msg="+encodeURIComponent(text)
+    });
+}
 
-.then(res=>res.text())
+requestPromise.then(res=>res.text())
 
 .then(data=>{
 
@@ -326,15 +279,6 @@ document.getElementById("thinking").remove();
 let botRow = document.createElement("div");
 botRow.className = "bot-row";
 
-// Simple HTML escaping to prevent XSS
-function escapeHtml(str) {
-    return str.replace(/&/g, "&amp;")
-              .replace(/</g, "&lt;")
-              .replace(/>/g, "&gt;")
-              .replace(/"/g, "&quot;")
-              .replace(/'/g, "&#039;");
-}
-
 botRow.innerHTML = `
 <div class="avatar"><i class="fas fa-robot"></i></div>
 <div class="message bot">${escapeHtml(data).replace(/\n/g,"<br>")}</div>
@@ -344,9 +288,15 @@ chat.appendChild(botRow);
 
 chat.scrollTop = chat.scrollHeight;
 
+if(selectedFile){
+    fileInput.value = "";
+    document.getElementById("fileNameDisplay").textContent = "No file selected";
+}
+
 // Re-enable input
 inputField.disabled = false;
 if(sendBtn) sendBtn.disabled = false;
+if(chooseBtn) chooseBtn.disabled = false;
 
 })
 
@@ -366,9 +316,8 @@ chat.scrollTop = chat.scrollHeight;
 // Re-enable input
 inputField.disabled = false;
 if(sendBtn) sendBtn.disabled = false;
+if(chooseBtn) chooseBtn.disabled = false;
 });
-
-},800);
 
 }
 
@@ -416,6 +365,10 @@ Hello! I am CampusGuide. Ask me anything about placements.
 
 resumeContainer.style.display = "none";
 
+fetch("/new_chat_session", { method: "POST" }).catch(error => {
+    console.error("Error starting new chat session:", error);
+});
+
 }
 
 
@@ -447,16 +400,33 @@ function escapeHtml(str) {
               .replace(/'/g, "&#039;");
 }
 
-chat.innerHTML += `
-<div class="user-row">
-<div class="message user">${escapeHtml(data.user).replace(/\n/g,"<br>")}</div>
-</div>
+let messages = data.messages || [];
 
-<div class="bot-row">
-<div class="avatar">AI</div>
-<div class="message bot">${escapeHtml(data.bot).replace(/\n/g,"<br>")}</div>
-</div>
-`;
+if(messages.length === 0){
+    chat.innerHTML += `
+    <div class="bot-row">
+    <div class="avatar"><i class="fas fa-robot"></i></div>
+    <div class="message bot">No messages found for this chat.</div>
+    </div>
+    `;
+} else {
+    messages.forEach(msg => {
+        if(msg.role === "user"){
+            chat.innerHTML += `
+            <div class="user-row">
+            <div class="message user">${escapeHtml((msg.content || "")).replace(/\n/g,"<br>")}</div>
+            </div>
+            `;
+        } else {
+            chat.innerHTML += `
+            <div class="bot-row">
+            <div class="avatar"><i class="fas fa-robot"></i></div>
+            <div class="message bot">${escapeHtml((msg.content || "")).replace(/\n/g,"<br>")}</div>
+            </div>
+            `;
+        }
+    });
+}
 
 chat.scrollTop = chat.scrollHeight;
 
@@ -470,9 +440,20 @@ alert("Failed to load chat history. Please try again.");
 
 /* TOGGLE SIDEBAR */
 
+function isMobileSidebarMode(){
+return window.matchMedia("(max-width: 1100px)").matches;
+}
+
 function toggleSidebar(){
 let sidebar = document.getElementById("sidebar");
+
+if(isMobileSidebarMode()){
+document.body.classList.remove("sidebar-collapsed");
 sidebar.classList.toggle("active");
+} else {
+sidebar.classList.remove("active");
+document.body.classList.toggle("sidebar-collapsed");
+}
 }
 
 /* CLOSE SIDEBAR WHEN CLICKING OUTSIDE */
@@ -481,9 +462,18 @@ document.addEventListener("click", function(event){
 let sidebar = document.getElementById("sidebar");
 let navBtn = document.querySelector(".nav-btn");
 
+if(!isMobileSidebarMode()) return;
+
 // Close sidebar if click is outside sidebar and not on menu button
-if(!sidebar.contains(event.target) && !navBtn.contains(event.target)){
+if(!sidebar.contains(event.target) && (!navBtn || !navBtn.contains(event.target))){
     sidebar.classList.remove("active");
+}
+});
+
+window.addEventListener("resize", function(){
+let sidebar = document.getElementById("sidebar");
+if(!isMobileSidebarMode()){
+sidebar.classList.remove("active");
 }
 });
 

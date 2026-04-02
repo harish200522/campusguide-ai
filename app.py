@@ -1,16 +1,29 @@
 import os
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session
 from chatbot import chatbot_response
 from database import init_db, save_chat, get_chats, get_chat_by_id, delete_chat_by_id
-from resume_analyzer import analyze_resume
+from resume_analyzer import extract_text_from_pdf, analyze_resume_text
 
 load_dotenv()
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "campusguide-dev-secret")
 
 # initialize database
 init_db()
+
+
+def build_resume_context(text, max_chars=2500):
+    cleaned_lines = [line.strip() for line in text.splitlines() if line.strip()]
+    cleaned_text = "\n".join(cleaned_lines)
+
+    if len(cleaned_text) <= max_chars:
+        return cleaned_text
+
+    head_len = int(max_chars * 0.7)
+    tail_len = max_chars - head_len - 20
+    return f"{cleaned_text[:head_len]}\n...\n{cleaned_text[-tail_len:]}"
 
 
 # ==========================
@@ -18,6 +31,8 @@ init_db()
 # ==========================
 @app.route("/")
 def home():
+    # Start a fresh active conversation on each page load/refresh.
+    session.pop("active_chat_id", None)
 
     chats = get_chats()
 
@@ -31,11 +46,20 @@ def home():
 def get_response():
 
     user_message = request.form["msg"]
+    resume_context = session.get("uploaded_resume_context")
 
-    bot_reply = chatbot_response(user_message)
+    # Backward compatibility for already-active sessions created before this fix.
+    if not resume_context and session.get("uploaded_resume_text"):
+        resume_context = build_resume_context(session.get("uploaded_resume_text"))
+        session["uploaded_resume_context"] = resume_context
+        session.pop("uploaded_resume_text", None)
 
-    # save chat to database
-    save_chat(user_message, bot_reply)
+    bot_reply = chatbot_response(user_message, resume_context=resume_context)
+    active_chat_id = session.get("active_chat_id")
+
+    # save all turns under one active conversation
+    saved_chat_id = save_chat(user_message, bot_reply, chat_id=active_chat_id)
+    session["active_chat_id"] = saved_chat_id
 
     return bot_reply
 
@@ -48,10 +72,14 @@ def load_chat(chat_id):
 
     chat = get_chat_by_id(chat_id)
 
-    return jsonify({
-        "user": chat[0],
-        "bot": chat[1]
-    })
+    if not chat:
+        session.pop("active_chat_id", None)
+        return jsonify({"messages": []})
+
+    # Continue this chat thread for subsequent user messages.
+    session["active_chat_id"] = chat_id
+
+    return jsonify(chat)
 
 
 # ==========================
@@ -61,14 +89,29 @@ def load_chat(chat_id):
 def upload_resume():
 
     file = request.files.get("resume")
+    user_message = request.form.get("msg", "").strip()
 
     if not file or file.filename == "":
         return "No file uploaded"
 
-    result = analyze_resume(file)
+    resume_text = extract_text_from_pdf(file)
+    if not resume_text:
+        return "Could not extract text from the resume. Please upload a valid PDF."
 
-    # save to chat history
-    save_chat("Analyze my resume: " + file.filename, result)
+    resume_context = build_resume_context(resume_text)
+    session["uploaded_resume_context"] = resume_context
+    session.pop("uploaded_resume_text", None)
+
+    if user_message:
+        result = chatbot_response(user_message, resume_context=resume_context)
+        active_chat_id = session.get("active_chat_id")
+        saved_chat_id = save_chat(f"{user_message} (with resume: {file.filename})", result, chat_id=active_chat_id)
+        session["active_chat_id"] = saved_chat_id
+    else:
+        result = analyze_resume_text(resume_text)
+        active_chat_id = session.get("active_chat_id")
+        saved_chat_id = save_chat("Uploaded resume: " + file.filename, result, chat_id=active_chat_id)
+        session["active_chat_id"] = saved_chat_id
 
     return result
 
@@ -85,6 +128,12 @@ def delete_chat(chat_id):
     except Exception as e:
         print(f"Error deleting chat {chat_id}: {e}")
         return f"Error: {str(e)}", 500
+
+
+@app.route("/new_chat_session", methods=["POST"])
+def new_chat_session():
+    session.pop("active_chat_id", None)
+    return "OK"
 
 
 # ==========================
