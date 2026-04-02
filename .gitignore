@@ -21,6 +21,9 @@ env/
 *.swp
 *.swo
 
+# Node dependencies
+node_modules/
+
 # OS
 Thumbs.db
 .DS_Store

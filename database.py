@@ -1,9 +1,25 @@
+import os
 import sqlite3
 import json
 
+
+def _get_db_path():
+    db_path = os.environ.get("DATABASE_PATH", "chat_history.db").strip()
+    return db_path or "chat_history.db"
+
+
+def _connect():
+    db_path = _get_db_path()
+    db_dir = os.path.dirname(db_path)
+
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
+
+    return sqlite3.connect(db_path)
+
 def init_db():
 
-    conn = sqlite3.connect("chat_history.db")
+    conn = _connect()
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -30,7 +46,7 @@ def init_db():
 
 def save_chat(user, bot, chat_id=None):
 
-    conn = sqlite3.connect("chat_history.db")
+    conn = _connect()
     cursor = conn.cursor()
 
     if chat_id:
@@ -76,7 +92,7 @@ def save_chat(user, bot, chat_id=None):
 
 def get_chats():
 
-    conn = sqlite3.connect("chat_history.db")
+    conn = _connect()
     cursor = conn.cursor()
 
     cursor.execute(
@@ -96,7 +112,7 @@ def get_chats():
 
 def get_chat_by_id(chat_id):
 
-    conn = sqlite3.connect("chat_history.db")
+    conn = _connect()
     cursor = conn.cursor()
 
     cursor.execute(
@@ -130,7 +146,7 @@ def get_chat_by_id(chat_id):
 
 def delete_chat_by_id(chat_id):
 
-    conn = sqlite3.connect("chat_history.db")
+    conn = _connect()
     cursor = conn.cursor()
 
     cursor.execute(

@@ -2,3 +2,4 @@ flask
 python-dotenv
 huggingface-hub
 PyPDF2
+gunicorn

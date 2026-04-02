@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: campusguide
+    env: python
+    plan: free
+    autoDeploy: true
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: FLASK_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_PATH
+        value: /var/data/chat_history.db
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: GEMINI_BASE_URL
+        value: https://generativelanguage.googleapis.com
+      - key: HF_MODEL
+        value: meta-llama/Llama-3.1-8B-Instruct
+    disk:
+      name: campusguide-data
+      mountPath: /var/data
+      sizeGB: 1
